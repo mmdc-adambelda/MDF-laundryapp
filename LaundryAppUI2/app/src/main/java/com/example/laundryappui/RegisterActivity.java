@@ -10,22 +10,32 @@ import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
 public class RegisterActivity extends AppCompatActivity {
 
     EditText edUsername, edEmail, edPassword, edConfirm;
     Button btn;
     TextView tv;
 
+    private final ExecutorService executorService = Executors.newSingleThreadExecutor();
+
+    private UserDatabase userDatabase;
+    private UserDao userDao;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_register);
 
+        userDatabase = UserDatabase.getInstance(this);
+        userDao = userDatabase.userDao();
+
         edUsername = findViewById(R.id.editTextRegUsername);
-        edPassword = findViewById(R.id.editTextRegEmail);
+        edEmail = findViewById(R.id.editTextRegEmail);
         edPassword = findViewById(R.id.editTextRegPassword);
-        edPassword = findViewById(R.id.editTextRegConfirmPassword);
+        edConfirm = findViewById(R.id.editTextRegConfirmPassword);
         btn = findViewById(R.id.buttonRegister);
         tv = findViewById(R.id.textViewExistingUser);
 
@@ -43,26 +53,60 @@ public class RegisterActivity extends AppCompatActivity {
                 String email = edEmail.getText().toString();
                 String password = edPassword.getText().toString();
                 String confirm = edConfirm.getText().toString();
-                Database db = new Database(getApplicationContext(),"laundryuser",null,1);
-                if(username.length()==0 || email.length()==0 || password.length()==0 || confirm.length()==0){
-                    Toast.makeText(getApplicationContext(),"All field is required", Toast.LENGTH_SHORT).show();
+                if(username.isEmpty() || email.isEmpty() || password.isEmpty() || confirm.isEmpty()){
+                    Toast.makeText(RegisterActivity.this,"All field is required", Toast.LENGTH_SHORT).show();
+                    return;
                 }
-                else {
-                    if(password.compareTo(confirm)==0) {
-                        if (isValid(password)) {
-                            db.register(username,email,password);
-                            Toast.makeText(getApplicationContext(), "Registration Successful", Toast.LENGTH_SHORT).show();
-                            startActivity(new Intent(RegisterActivity.this, LoginActivity.class));
-                        }
-                        else {
-                            Toast.makeText(getApplicationContext(), "Password must contain at least 8 characters.", Toast.LENGTH_SHORT).show();
-                        }
-                    }else{
-                        Toast.makeText(getApplicationContext(),"Password and Confirm password didn't match",Toast.LENGTH_SHORT).show();
+
+                executorService.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        final UserEntity userEntity = userDao.getUserByUsername(username);
+
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+
+                                if (userEntity != null){
+                                    Toast.makeText(RegisterActivity.this, "User already exist.", Toast.LENGTH_SHORT).show();
+                                    return;
+                                } else {
+
+                                    if (password.compareTo(confirm) == 0) {
+                                        if (isValid(password)) {
+
+                                            executorService.execute(new Runnable() {
+                                                @Override
+                                                public void run() {
+                                                    UserEntity newuserEntity = new UserEntity();
+                                                    newuserEntity.username = username;
+                                                    newuserEntity.password = password;
+                                                    newuserEntity.email = email;
+                                                    userDao.registerUser(newuserEntity);
+                                                }
+                                            });
+
+                                            Toast.makeText(RegisterActivity.this, "Registration Successful", Toast.LENGTH_SHORT).show();
+                                            startActivity(new Intent(RegisterActivity.this, LoginActivity.class));
+                                        }
+                                        else {
+                                            Toast.makeText(RegisterActivity.this, "Password must contain at least 8 characters.", Toast.LENGTH_SHORT).show();
+                                        }
+                                    } else {
+                                        Toast.makeText(RegisterActivity.this,"Password and Confirm password didn't match",Toast.LENGTH_SHORT).show();
+                                    }
+
+                                }
+
+                            }
+                        });
+
                     }
-                }
+                });
+
             }
         });
+
     }
     public static boolean isValid(String passwordhere) {
         int f1=0,f2=0,f3=0;
