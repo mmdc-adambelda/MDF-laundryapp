@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">LaundryAppUI</string>
+    <string name="default_web_client_id">283497008346-l0n1e4osdq3ijffk64s9rrirl5eo15sq.apps.googleusercontent.com</string>
+
 </resources>
